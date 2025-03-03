@@ -23,6 +23,7 @@ COMPLETE_PACKET_DICT = {
 def protocol(monkeypatch):
     """Rflinkprotocol instance with mocked handle_packet."""
     monkeypatch.setattr(PacketHandling, "handle_packet", Mock())
+    monkeypatch.setattr(PacketHandling, "send_raw_packet", Mock())
     return PacketHandling(None)
 
 
@@ -89,3 +90,23 @@ def test_ignore(event_protocol, expected):
     event_protocol.data_received(COMPLETE_PACKET)
 
     assert event_protocol.handle_event.call_count == expected, event_protocol.ignore
+
+
+@pytest.mark.parametrize(
+    "command,action,check",
+    [
+        ('RFDEBUG', 'ON', '10;RFDEBUG;ON;'),
+        ('RFDEBUG', 'OFF', '10;RFDEBUG;OFF;'),
+        ('VERSION', None, '10;VERSION;'),
+        # ('WHATEVER', None, None),
+    ]
+)
+def test_send_special_command(protocol, command, action, check):
+    """Test diferent send_command"""
+    protocol.send_special_command(command, action)
+
+    protocol.send_raw_packet.assert_called_once_with(check)
+    # if check:
+    #     protocol.send_raw_packet.assert_called_once_with(check)
+    # else:
+    #     assert protocol.send_raw_packet.call_count == 0

@@ -1,7 +1,8 @@
 # RFLink Startup communication example
 20;00;Nodo RadioFrequencyLink - RFLink Gateway V1.1 - R46;
+# 20;00;Nodo RadioFrequencyLink - RFLink Gateway V1.1 - R51
 # 20;01;MySensors=OFF;NO NRF24L01;
-# 20;02;setGPIO=ON;
+20;02;setGPIO=ON;
 20;03;Cresta;ID=8301;WINDIR=0005;WINSP=0000;WINGS=0000;WINTMP=00c3;WINCHL=00c3;BAT=LOW;
 20;04;Cresta;ID=3001;TEMP=00b4;HUM=50;BAT=OK;
 20;05;Cresta;ID=2801;TEMP=00af;HUM=53;BAT=OK;

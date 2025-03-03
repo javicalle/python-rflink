@@ -12,6 +12,7 @@ from typing import Any, Callable, DefaultDict, Dict, Generator, cast
 log = logging.getLogger(__name__)
 
 UNKNOWN = "unknown"
+SPECIAL_COMMAND_TEMPLATE = "{node};{special_command};"
 SWITCH_COMMAND_TEMPLATE = "{node};{protocol};{id};{switch};{command};"
 PACKET_ID_SEP = "_"
 
@@ -31,6 +32,21 @@ RESPONSES = "OK"
 VERSION = r"[0-9a-zA-Z \.-]+"
 DEBUG = "DEBUG"
 MESSAGE = r"[0-9a-zA-Z \._-]+"
+
+RFLINK_SPECIAL_COMMANDS = {
+    'REBOOT',
+    'PING',
+    'VERSION',
+    'RFDEBUG',
+    'RFUDEBUG',
+    'QRFDEBUG',
+    'TRISTATEINVERT',
+    'RTSCLEAN',
+    'RTSRECCLEAN',
+    'RTSSHOW',
+    'RTSINVERT',
+    'RTSLONGTX',
+}
 
 # 10;NewKaku;0cac142;3;ON;
 PACKET_COMMAND = DELIM.join(["10", PROTOCOL, ADDRESS, BUTTON, COMMAND])
@@ -56,16 +72,21 @@ PACKET_INFO = DELIM.join(["20", SEQUENCE, MESSAGE])
 # 20;75;DEBUG;Pulses=90;Pulses(uSec)=1200,2760,120...
 PACKET_DEBUG = DELIM.join(["20", SEQUENCE, DEBUG, DEBUG_DATA])
 
+# 20;01;RFDEBUG=OFF;
 # 20;01;RFUDEBUG=OFF;
-PACKET_RFDEBUGN = DELIM.join(["20", SEQUENCE, "RFDEBUG=ON"])
-PACKET_RFDEBUGF = DELIM.join(["20", SEQUENCE, "RFDEBUG=OFF"])
-PACKET_RFUDEBUGN = DELIM.join(["20", SEQUENCE, "RFUDEBUG=ON"])
-PACKET_RFUDEBUGF = DELIM.join(["20", SEQUENCE, "RFUDEBUG=OFF"])
-PACKET_QRFDEBUGN = DELIM.join(["20", SEQUENCE, "QRFDEBUG=ON"])
-PACKET_QRFDEBUGF = DELIM.join(["20", SEQUENCE, "QRFDEBUG=OFF"])
+# 20;01;QRFDEBUG=OFF;
+# PACKET_RFDEBUGN = DELIM.join(["20", SEQUENCE, "RFDEBUG=ON"])
+# PACKET_RFDEBUGF = DELIM.join(["20", SEQUENCE, "RFDEBUG=OFF"])
+# PACKET_RFUDEBUGN = DELIM.join(["20", SEQUENCE, "RFUDEBUG=ON"])
+# PACKET_RFUDEBUGF = DELIM.join(["20", SEQUENCE, "RFUDEBUG=OFF"])
+# PACKET_QRFDEBUGN = DELIM.join(["20", SEQUENCE, "QRFDEBUG=ON"])
+# PACKET_QRFDEBUGF = DELIM.join(["20", SEQUENCE, "QRFDEBUG=OFF"])
+PACKET_RFDEBUG = DELIM.join(["20", SEQUENCE, "Q?RFU?DEBUG=(ON|OFF)"])
 
-PACKET_GPIOON = DELIM.join(["20", SEQUENCE, "setGPIO=ON"])
-PACKET_GPIOOFF = DELIM.join(["20", SEQUENCE, "setGPIO=OFF"])
+# PACKET_GPIOON = DELIM.join(["20", SEQUENCE, "setGPIO=ON"])
+# PACKET_GPIOOFF = DELIM.join(["20", SEQUENCE, "setGPIO=OFF"])
+PACKET_GPIO = DELIM.join(["20", SEQUENCE, "setGPIO=(ON|OFF)"])
+
 
 # 20;84;Debug;RTS P1;a63f33003cf000665a5a;
 PACKET_DEBUGRTS = DELIM.join(["20", SEQUENCE, "Debug", DEBUG_DATA_RTS])
@@ -81,21 +102,23 @@ PACKET_HEADER_RE = (
             PACKET_DEVICE_CREATE,
             PACKET_RESPONSE,
             PACKET_DEVICE,
-            PACKET_COMMAND,
-            PACKET_COMMAND2,
-            PACKET_COMMAND3,
-            PACKET_COMMAND4,
-            PACKET_CONTROL,
+            # PACKET_COMMAND,
+            # PACKET_COMMAND2,
+            # PACKET_COMMAND3,
+            # PACKET_COMMAND4,
+            # PACKET_CONTROL,
             PACKET_DEBUG,
             PACKET_INFO,
-            PACKET_RFDEBUGN,
-            PACKET_RFUDEBUGN,
-            PACKET_RFDEBUGF,
-            PACKET_RFUDEBUGF,
-            PACKET_QRFDEBUGN,
-            PACKET_QRFDEBUGF,
-            PACKET_GPIOOFF,
-            PACKET_GPIOON,
+            # PACKET_RFDEBUGN,
+            # PACKET_RFUDEBUGN,
+            # PACKET_RFDEBUGF,
+            # PACKET_RFUDEBUGF,
+            # PACKET_QRFDEBUGN,
+            # PACKET_QRFDEBUGF,
+            PACKET_RFDEBUG,
+            # PACKET_GPIOOFF,
+            # PACKET_GPIOON,
+            PACKET_GPIO,
             PACKET_DEBUGRTS,
         ]
     )
@@ -287,7 +310,13 @@ def decode_packet(packet: str) -> PacketType:
     # make exception for version response
     data["protocol"] = UNKNOWN
     if "=" in protocol:
-        attrs = protocol + DELIM + attrs
+        key, value = protocol.lower().split("=", 1)
+        if key in RFLINK_SPECIAL_COMMANDS:
+            data["protocol"] = key.lower()
+            data["command"] = value.lower()
+            data["ok"] = True
+        else:
+            attrs = protocol + DELIM + attrs
 
     # no attributes but instead the welcome banner
     elif "RFLink Gateway" in protocol:
@@ -295,10 +324,12 @@ def decode_packet(packet: str) -> PacketType:
 
     elif protocol == "PONG":
         data["ping"] = protocol.lower()
+        data["ok"] = True
 
     # debug response
     elif protocol.lower() == "debug":
         data["protocol"] = protocol.lower()
+        data["ok"] = True
         if attrs.startswith("RTS P1"):
             data["rts_p1"] = attrs.strip(DELIM).split(DELIM)[1]
         else:
@@ -315,7 +346,11 @@ def decode_packet(packet: str) -> PacketType:
 
     # generic message from gateway
     elif node_id == "20" and not attrs:
-        data["message"] = protocol
+        if protocol in RFLINK_SPECIAL_COMMANDS:
+            data["protocol"] = protocol.lower()
+            data["ok"] = True
+        else:
+            data["message"] = protocol
 
     # its a regular packet
     else:
@@ -369,13 +404,38 @@ def encode_packet(packet: PacketType) -> str:
     '10;newkaku;000001;01;on;'
     """
     if packet["protocol"] == "rfdebug":
+        log.warning("Deprecated use of 'send_command' with 'rfdebug' protocol. Use 'send_special_command' instead.")
         return "10;RFDEBUG=%s;" % packet["command"]
     elif packet["protocol"] == "rfudebug":
+        log.warning("Deprecated use of 'send_command' with 'rfudebug' protocol. Use 'send_special_command' instead.")
         return "10;RFUDEBUG=%s;" % packet["command"]
     elif packet["protocol"] == "qrfdebug":
+        log.warning("Deprecated use of 'send_command' with 'qrfdebug' protocol. Use 'send_special_command' instead.")
         return "10;QRFDEBUG=%s;" % packet["command"]
     else:
         return SWITCH_COMMAND_TEMPLATE.format(node=PacketHeader.master.value, **packet)
+
+
+def encode_special_packet(packet: PacketType) -> str:
+    """Construct special packet string from packet dictionary.
+
+    >>> encode_packet({
+    ...     'protocol': 'rfdebug',
+    ...     'command': 'on',
+    ... })
+    '10;RFDEBUG;on;'
+    """
+    assert packet["protocol"] in  RFLINK_SPECIAL_COMMANDS
+    spcl_cmmnd = f"{packet['protocol']}{DELIM}{packet['command']}" if packet['command'] else f"{packet['protocol']}"
+    return SPECIAL_COMMAND_TEMPLATE.format(node=PacketHeader.master.value, special_command=spcl_cmmnd)
+
+    # if packet["protocol"] in  RFLINK_SPECIAL_COMMANDS:
+    #     spcl_cmmnd = f"{packet['protocol']}{DELIM}{packet['command']}" if packet['command'] else f"{packet['protocol']}"
+    #     # return SPECIAL_COMMAND_TEMPLATE.format(node=PacketHeader.master.value, **packet)
+    #     # return DELIM.join(node=PacketHeader.master.value, **packet, '')
+    #     # return f"{PacketHeader.master.value}{DELIM}{packet['protocol']}{DELIM}{packet['command']}{DELIM} if {packet['command']}"
+    #     # return f"{PacketHeader.master.value}{DELIM}{packet['protocol']}({DELIM}{packet['command']}{DELIM} if {packet['command']})"
+    #     return SPECIAL_COMMAND_TEMPLATE.format(node=PacketHeader.master.value, special_command=spcl_cmmnd)
 
 
 # create lookup table of not easy to reverse protocol names

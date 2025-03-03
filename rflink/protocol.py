@@ -32,6 +32,7 @@ from .parser import (
     decode_packet,
     deserialize_packet_id,
     encode_packet,
+    encode_special_packet,
     packet_events,
     valid_packet,
 )
@@ -211,6 +212,10 @@ class PacketHandling(ProtocolBase):
         """Concat fields and send packet to gateway."""
         self.send_raw_packet(encode_packet(fields))
 
+    def send_special_packet(self, fields: PacketType) -> None:
+        """Concat fields and send packet to gateway."""
+        self.send_raw_packet(encode_special_packet(fields))
+
     def send_command(self, device_id: str, action: str) -> None:
         """Send device command to rflink gateway."""
         command = deserialize_packet_id(device_id)
@@ -218,6 +223,14 @@ class PacketHandling(ProtocolBase):
         log.debug("sending command: %s", command)
         self.send_packet(command)
 
+    def send_special_command(self, protocol: str, action: Optional[str]) -> None:
+        """Send special control command to rflink gateway."""
+        command = {
+            "protocol": protocol,
+            "command": action,
+        }
+        log.debug("sending special command: %s", command)
+        self.send_special_packet(command)
 
 class CommandSerialization(PacketHandling):
     """Logic for ensuring asynchronous commands are sent in order."""
