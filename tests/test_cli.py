@@ -31,6 +31,6 @@ def test_spawns(monkeypatch):
     # monkeypatch.setattr(SerialTransport, "_ensure_reader", lambda self: True)
 
     # test calling results in the loop close cleanly
-    with patch('serialx.common.BaseSerialTransport.connect', return_value=True):
+    with patch("serialx.common.BaseSerialTransport.connect", return_value=True):
         result = main(args, loop=loop)
     assert result is None
