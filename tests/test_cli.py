@@ -1,8 +1,8 @@
 """Basic testing for CLI."""
 
-import asyncio
+from unittest.mock import patch
 
-from serialx import SerialTransport
+import asyncio
 
 from rflink.__main__ import main
 
@@ -25,10 +25,12 @@ def test_spawns(monkeypatch):
     ensure_future(stop(), loop=loop)
 
     # use simulation interface
-    args = ["--port", "loop://", "-v"]
+    args = ["--port", "device://test.local", "-v"]
 
     # # patch to make 'loop://' work with serial_asyncio
     # monkeypatch.setattr(SerialTransport, "_ensure_reader", lambda self: True)
 
     # test calling results in the loop close cleanly
-    assert main(args, loop=loop) is None
+    with patch('serialx.common.BaseSerialTransport.connect', return_value=True):
+        result = main(args, loop=loop)
+    assert result is None
