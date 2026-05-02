@@ -2,7 +2,7 @@
 
 import asyncio
 
-from serial_asyncio_fast import SerialTransport
+from serialx import SerialTransport
 
 from rflinkproxy.__main__ import main
 
@@ -27,8 +27,8 @@ def test_spawns(monkeypatch):
     # use simulation interface
     args = ["--port", "loop://", "-v"]
 
-    # patch to make 'loop://' work with serial_asyncio
-    monkeypatch.setattr(SerialTransport, "_ensure_reader", lambda self: True)
+    # # patch to make 'loop://' work with serial_asyncio
+    # monkeypatch.setattr(SerialTransport, "_ensure_reader", lambda self: True)
 
     # test calling results in the loop close cleanly
     assert main(args, loop=loop) is None
