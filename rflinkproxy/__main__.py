@@ -25,7 +25,7 @@ from importlib.metadata import version
 from typing import Any, Callable, Dict, cast
 
 from docopt import docopt
-from serialx import create_serial_connection
+from serialx import create_serial_connection, SerialException
 
 from rflink.asyncio_utils import get_or_create_event_loop
 from rflink.parser import (
@@ -227,8 +227,6 @@ class RFLinkProxy:
 
     async def connect(self):
         """Set up connection and hook it into HA for reconnect/shutdown."""
-        import serial
-
         log.info("Initiating Rflink connection")
 
         # Rflink create_rflink_connection decides based on the value of host
@@ -261,7 +259,7 @@ class RFLinkProxy:
                     self.transport, self.protocol = await connection
 
         except (
-            serial.serialutil.SerialException,
+            SerialException,
             ConnectionRefusedError,
             TimeoutError,
             OSError,
