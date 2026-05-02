@@ -25,7 +25,7 @@ from importlib.metadata import version
 from typing import Any, Callable, Dict, cast
 
 from docopt import docopt
-from serial_asyncio_fast import create_serial_connection
+from serialx import create_serial_connection
 
 from rflink.asyncio_utils import get_or_create_event_loop
 from rflink.parser import (

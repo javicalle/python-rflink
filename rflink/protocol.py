@@ -24,7 +24,7 @@ from typing import (
     overload,
 )
 
-from serial_asyncio_fast import create_serial_connection
+from serialx import create_serial_connection
 
 from .parser import (
     PacketType,

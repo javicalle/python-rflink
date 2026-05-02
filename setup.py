@@ -58,8 +58,9 @@ setup(
     package_data={"rflink": ["py.typed"]},
     install_requires=[
         "docopt",
-        "pyserial",
-        "pyserial-asyncio-fast",
+        # "pyserial",
+        # "pyserial-asyncio-fast",
+        "serialx",
         'typing;python_version<"3.5"',
         'async_timeout;python_version<"3.11"',
     ],
